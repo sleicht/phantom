@@ -17,6 +17,10 @@ export function getWorktreesDirectory(
 export function getWorktreePathFromDirectory(
   worktreeDirectory: string,
   name: string,
+  directoryNameSeparator?: string,
 ): string {
-  return join(worktreeDirectory, name);
+  const directoryName = directoryNameSeparator
+    ? name.replaceAll("/", directoryNameSeparator)
+    : name;
+  return join(worktreeDirectory, directoryName);
 }

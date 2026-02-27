@@ -209,6 +209,35 @@ describe("validateConfig", () => {
     }
   });
 
+  test("should accept config with directoryNameSeparator", () => {
+    const config = {
+      directoryNameSeparator: "-",
+    };
+
+    const result = validateConfig(config);
+
+    assert.strictEqual(isOk(result), true);
+    if (isOk(result)) {
+      assert.deepStrictEqual(result.value, config);
+    }
+  });
+
+  test("should accept config with directoryNameSeparator and other options", () => {
+    const config = {
+      directoryNameSeparator: "_",
+      postCreate: {
+        copyFiles: [".env"],
+      },
+    };
+
+    const result = validateConfig(config);
+
+    assert.strictEqual(isOk(result), true);
+    if (isOk(result)) {
+      assert.deepStrictEqual(result.value, config);
+    }
+  });
+
   describe("error cases", () => {
     test("should reject string config", () => {
       const result = validateConfig("not an object");
@@ -670,6 +699,32 @@ describe("validateConfig", () => {
         assert.strictEqual(
           result.error.message,
           "Invalid phantom.config.json: preDelete.commands.1: Invalid input: expected string, received object",
+        );
+      }
+    });
+
+    test("should reject when directoryNameSeparator is number", () => {
+      const result = validateConfig({ directoryNameSeparator: 123 });
+
+      assert.strictEqual(isErr(result), true);
+      if (isErr(result)) {
+        assert.ok(result.error instanceof ConfigValidationError);
+        assert.strictEqual(
+          result.error.message,
+          "Invalid phantom.config.json: directoryNameSeparator: Invalid input: expected string, received number",
+        );
+      }
+    });
+
+    test("should reject when directoryNameSeparator is boolean", () => {
+      const result = validateConfig({ directoryNameSeparator: true });
+
+      assert.strictEqual(isErr(result), true);
+      if (isErr(result)) {
+        assert.ok(result.error instanceof ConfigValidationError);
+        assert.strictEqual(
+          result.error.message,
+          "Invalid phantom.config.json: directoryNameSeparator: Invalid input: expected string, received boolean",
         );
       }
     });

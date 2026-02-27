@@ -101,10 +101,13 @@ export async function createHandler(args: string[]): Promise<void> {
     const gitRoot = await getGitRoot();
     const context = await createContext(gitRoot);
 
+    const directoryNameSeparator = context.config?.directoryNameSeparator;
+
     if (!worktreeName) {
       const nameResult = await generateUniqueName(
         gitRoot,
         context.worktreesDirectory,
+        directoryNameSeparator,
       );
       if (isErr(nameResult)) {
         exitWithError(nameResult.error.message, exitCodes.generalError);
@@ -135,6 +138,7 @@ export async function createHandler(args: string[]): Promise<void> {
       {
         copyFiles: filesToCopy.length > 0 ? filesToCopy : undefined,
         base: baseOption,
+        directoryNameSeparator,
       },
       filesToCopy.length > 0 ? filesToCopy : undefined,
       context.config?.postCreate?.commands,

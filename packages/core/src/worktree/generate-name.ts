@@ -1,5 +1,5 @@
 import { branchExists } from "@aku11i/phantom-git";
-import { err, isErr, isOk, ok, type Result } from "@aku11i/phantom-shared";
+import { err, isErr, ok, type Result } from "@aku11i/phantom-shared";
 import { humanId } from "human-id";
 import { getWorktreePathFromDirectory } from "../paths.ts";
 import {
@@ -16,6 +16,7 @@ function generate(): string {
 export async function generateUniqueName(
   gitRoot: string,
   worktreesDirectory: string,
+  directoryNameSeparator?: string,
 ): Promise<Result<string, Error>> {
   for (let i = 0; i < MAX_RETRIES; i++) {
     const name = generate();
@@ -24,7 +25,11 @@ export async function generateUniqueName(
       continue;
     }
 
-    const worktreePath = getWorktreePathFromDirectory(worktreesDirectory, name);
+    const worktreePath = getWorktreePathFromDirectory(
+      worktreesDirectory,
+      name,
+      directoryNameSeparator,
+    );
     if (await validateWorktreeDirectoryExists(worktreePath)) {
       continue;
     }

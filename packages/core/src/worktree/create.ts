@@ -17,6 +17,7 @@ export interface CreateWorktreeOptions {
   branch?: string;
   base?: string;
   copyFiles?: string[];
+  directoryNameSeparator?: string;
 }
 
 export interface CreateWorktreeSuccess {
@@ -42,9 +43,13 @@ export async function createWorktree(
     return nameValidation;
   }
 
-  const { branch = name, base = "HEAD" } = options;
+  const { branch = name, base = "HEAD", directoryNameSeparator } = options;
 
-  const worktreePath = getWorktreePathFromDirectory(worktreeDirectory, name);
+  const worktreePath = getWorktreePathFromDirectory(
+    worktreeDirectory,
+    name,
+    directoryNameSeparator,
+  );
 
   try {
     await fs.access(worktreeDirectory);
@@ -94,6 +99,7 @@ export async function createWorktree(
         worktreeDirectory,
         name,
         postCreateCopyFiles,
+        directoryNameSeparator,
       );
       if (isErr(copyResult)) {
         // Don't fail worktree creation, just warn
