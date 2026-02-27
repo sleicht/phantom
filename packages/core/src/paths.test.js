@@ -1,7 +1,10 @@
 import { strictEqual } from "node:assert";
 import { normalize } from "node:path";
 import { describe, it } from "node:test";
-import { getWorktreesDirectory } from "./paths.ts";
+import {
+  getWorktreePathFromDirectory,
+  getWorktreesDirectory,
+} from "./paths.ts";
 
 describe("paths", () => {
   describe("getWorktreesDirectory", () => {
@@ -72,6 +75,50 @@ describe("paths", () => {
         // path.join normalizes paths and may add trailing slash
         strictEqual(normalize(result), normalize("/test/phantom-external/"));
       });
+    });
+  });
+
+  describe("getWorktreePathFromDirectory", () => {
+    it("should join directory and name without separator", () => {
+      const result = getWorktreePathFromDirectory("/worktrees", "my-branch");
+      strictEqual(normalize(result), normalize("/worktrees/my-branch"));
+    });
+
+    it("should create nested path when name contains slash and no separator", () => {
+      const result = getWorktreePathFromDirectory("/worktrees", "feature/test");
+      strictEqual(normalize(result), normalize("/worktrees/feature/test"));
+    });
+
+    it("should replace slashes with separator when provided", () => {
+      const result = getWorktreePathFromDirectory(
+        "/worktrees",
+        "feature/test",
+        "-",
+      );
+      strictEqual(normalize(result), normalize("/worktrees/feature-test"));
+    });
+
+    it("should replace multiple slashes with separator", () => {
+      const result = getWorktreePathFromDirectory("/worktrees", "a/b/c", "_");
+      strictEqual(normalize(result), normalize("/worktrees/a_b_c"));
+    });
+
+    it("should not modify name without slashes even with separator", () => {
+      const result = getWorktreePathFromDirectory(
+        "/worktrees",
+        "my-branch",
+        "-",
+      );
+      strictEqual(normalize(result), normalize("/worktrees/my-branch"));
+    });
+
+    it("should handle undefined separator same as no separator", () => {
+      const result = getWorktreePathFromDirectory(
+        "/worktrees",
+        "feature/test",
+        undefined,
+      );
+      strictEqual(normalize(result), normalize("/worktrees/feature/test"));
     });
   });
 });
