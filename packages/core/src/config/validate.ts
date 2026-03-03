@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "@aku11i/phantom-shared";
 import { z } from "zod";
+import { ALL_HOOK_TYPES } from "../hooks/types.ts";
 import type { PhantomConfig } from "./loader.ts";
 
 export class ConfigValidationError extends Error {
@@ -9,8 +10,27 @@ export class ConfigValidationError extends Error {
   }
 }
 
+const hookConfigSchema = z
+  .object({
+    commands: z.array(z.string()).optional(),
+    copyFiles: z.array(z.string()).optional(),
+    background: z.boolean().optional(),
+    failFast: z.boolean().optional(),
+  })
+  .passthrough();
+
+const allHookTypesSet = new Set<string>(ALL_HOOK_TYPES);
+
+const hooksSchema = z
+  .record(z.string(), hookConfigSchema.optional())
+  .refine((obj) => Object.keys(obj).every((key) => allHookTypesSet.has(key)), {
+    message: `Unknown hook type. Valid types: ${ALL_HOOK_TYPES.join(", ")}`,
+  })
+  .optional();
+
 export const phantomConfigSchema = z
   .object({
+    hooks: hooksSchema,
     postCreate: z
       .object({
         copyFiles: z.array(z.string()).optional(),

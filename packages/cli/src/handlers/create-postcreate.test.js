@@ -65,7 +65,7 @@ mock.module("@aku11i/phantom-process", {
 const { createHandler } = await import("./create.ts");
 
 describe("createHandler postCreate", () => {
-  it("should pass config to createWorktree for postCreate execution", async () => {
+  it("should pass hooks to createWorktree for postCreate execution", async () => {
     exitWithErrorMock.mock.resetCalls();
     outputLogMock.mock.resetCalls();
     outputErrorMock.mock.resetCalls();
@@ -80,6 +80,11 @@ describe("createHandler postCreate", () => {
         worktreesDirectory: `${gitRoot}/.git/phantom/worktrees`,
         config: {
           postCreate: {
+            commands: ["npm install", "npm test"],
+          },
+        },
+        hooks: {
+          "post-create": {
             commands: ["npm install", "npm test"],
           },
         },
@@ -100,21 +105,14 @@ describe("createHandler postCreate", () => {
       /Exit with success/,
     );
 
-    // Verify that createWorktree was called with extracted postCreate values
+    // Verify that createWorktree was called with hooks
     deepStrictEqual(createWorktreeMock.mock.calls.length, 1);
-    const [
-      gitRoot,
-      worktreeDirectory,
-      name,
-      ,
-      postCreateCopyFiles,
-      postCreateCommands,
-    ] = createWorktreeMock.mock.calls[0].arguments;
+    const [gitRoot, worktreeDirectory, name, , hooks] =
+      createWorktreeMock.mock.calls[0].arguments;
     deepStrictEqual(gitRoot, "/repo");
     deepStrictEqual(worktreeDirectory, "/repo/.git/phantom/worktrees");
     deepStrictEqual(name, "feature");
-    deepStrictEqual(postCreateCopyFiles, undefined);
-    deepStrictEqual(postCreateCommands, ["npm install", "npm test"]);
+    deepStrictEqual(hooks["post-create"].commands, ["npm install", "npm test"]);
   });
 
   it("should exit with error if createWorktree fails due to postCreate", async () => {
@@ -130,6 +128,11 @@ describe("createHandler postCreate", () => {
         worktreesDirectory: `${gitRoot}/.git/phantom/worktrees`,
         config: {
           postCreate: {
+            commands: ["invalid-command"],
+          },
+        },
+        hooks: {
+          "post-create": {
             commands: ["invalid-command"],
           },
         },
@@ -157,7 +160,7 @@ describe("createHandler postCreate", () => {
     ]);
   });
 
-  it("should pass config with only copyFiles to createWorktree", async () => {
+  it("should pass hooks with copyFiles to createWorktree", async () => {
     exitWithErrorMock.mock.resetCalls();
     outputLogMock.mock.resetCalls();
     getGitRootMock.mock.resetCalls();
@@ -171,6 +174,11 @@ describe("createHandler postCreate", () => {
         worktreesDirectory: `${gitRoot}/.git/phantom/worktrees`,
         config: {
           postCreate: {
+            copyFiles: [".env"],
+          },
+        },
+        hooks: {
+          "post-create": {
             copyFiles: [".env"],
           },
         },
@@ -190,11 +198,9 @@ describe("createHandler postCreate", () => {
       /Exit with success/,
     );
 
-    // Verify that createWorktree was called with correct config
+    // Verify that createWorktree was called with hooks containing copyFiles
     deepStrictEqual(createWorktreeMock.mock.calls.length, 1);
-    const [, , , , postCreateCopyFiles, postCreateCommands] =
-      createWorktreeMock.mock.calls[0].arguments;
-    deepStrictEqual(postCreateCopyFiles, [".env"]);
-    deepStrictEqual(postCreateCommands, undefined);
+    const [, , , , hooks] = createWorktreeMock.mock.calls[0].arguments;
+    deepStrictEqual(hooks["post-create"].copyFiles, [".env"]);
   });
 });

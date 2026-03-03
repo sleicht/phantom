@@ -10,6 +10,9 @@ const attachWorktreeMock = mock.fn();
 const getWorktreePathFromDirectoryMock = mock.fn((worktreeDirectory, name) => {
   return `${worktreeDirectory}/${name}`;
 });
+const executeHookMock = mock.fn(() =>
+  Promise.resolve(ok({ executedCommands: [], backgroundCommands: [] })),
+);
 
 mock.module("./validate.ts", {
   namedExports: {
@@ -39,6 +42,12 @@ mock.module("../paths.ts", {
   },
 });
 
+mock.module("../hooks/executor.ts", {
+  namedExports: {
+    executeHook: executeHookMock,
+  },
+});
+
 const { attachWorktreeCore } = await import("./attach.ts");
 
 describe("attachWorktreeCore", () => {
@@ -48,6 +57,7 @@ describe("attachWorktreeCore", () => {
     branchExistsMock.mock.resetCalls();
     attachWorktreeMock.mock.resetCalls();
     getWorktreePathFromDirectoryMock.mock.resetCalls();
+    executeHookMock.mock.resetCalls();
   };
 
   it("should attach to existing branch successfully", async () => {
@@ -63,8 +73,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature-branch",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, true);
@@ -102,8 +111,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature/branch",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, false);
@@ -127,8 +135,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "existing-feature",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, false);
@@ -153,8 +160,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "non-existent",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, false);
@@ -179,8 +185,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, false);
@@ -201,8 +206,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature",
-      undefined,
-      undefined,
+      {},
     );
 
     deepStrictEqual(result.ok, false);

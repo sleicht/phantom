@@ -91,16 +91,16 @@ export async function attachHandler(args: string[]): Promise<void> {
   const gitRoot = await getGitRoot();
   const context = await createContext(gitRoot);
 
-  let copyFiles = context.config?.postCreate?.copyFiles ?? [];
-
+  // Merge CLI --copy-file options into hooks
+  const hooks = { ...context.hooks };
   if (copyFileOptions && copyFileOptions.length > 0) {
     const cliCopyFiles = Array.isArray(copyFileOptions)
       ? copyFileOptions
       : [copyFileOptions];
-    copyFiles = [...new Set([...copyFiles, ...cliCopyFiles])];
+    const existing = hooks["post-create"]?.copyFiles ?? [];
+    const merged = [...new Set([...existing, ...cliCopyFiles])];
+    hooks["post-create"] = { ...hooks["post-create"], copyFiles: merged };
   }
-
-  const postCreateCopyFiles = copyFiles.length > 0 ? copyFiles : undefined;
 
   if (tmuxOption && !(await isInsideTmux())) {
     exitWithError(
@@ -113,8 +113,7 @@ export async function attachHandler(args: string[]): Promise<void> {
     context.gitRoot,
     context.worktreesDirectory,
     branchName,
-    postCreateCopyFiles,
-    context.config?.postCreate?.commands,
+    hooks,
   );
 
   if (isErr(result)) {

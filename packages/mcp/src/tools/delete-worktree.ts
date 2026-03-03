@@ -26,7 +26,7 @@ export const deleteWorktreeTool: Tool<typeof schema> = {
       {
         force,
       },
-      context.config?.preDelete?.commands,
+      context.hooks,
     );
 
     if (!isOk(result)) {

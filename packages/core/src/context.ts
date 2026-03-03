@@ -1,5 +1,7 @@
 import { isOk } from "@aku11i/phantom-shared";
 import { loadConfig, type PhantomConfig } from "./config/loader.ts";
+import { resolveHooks } from "./hooks/resolve.ts";
+import type { HooksConfig } from "./hooks/types.ts";
 import { getWorktreesDirectory } from "./paths.ts";
 import { loadPreferences, type Preferences } from "./preferences/loader.ts";
 
@@ -8,6 +10,7 @@ export interface Context {
   worktreesDirectory: string;
   config: PhantomConfig | null;
   preferences: Preferences;
+  hooks: HooksConfig;
 }
 
 export async function createContext(gitRoot: string): Promise<Context> {
@@ -31,5 +34,6 @@ export async function createContext(gitRoot: string): Promise<Context> {
     worktreesDirectory: getWorktreesDirectory(gitRoot, worktreesDirectory),
     config,
     preferences,
+    hooks: resolveHooks(config),
   };
 }

@@ -92,7 +92,7 @@ export async function deleteHandler(args: string[]): Promise<void> {
         {
           force: forceDelete,
         },
-        context.config?.preDelete?.commands,
+        context.hooks,
       );
 
       if (isErr(result)) {
