@@ -62,12 +62,14 @@ describe("createWorktreeTool", () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
     const worktreePath = "/path/to/repo/.git/phantom/worktrees/feature-1";
+    const hooks = {};
 
     getGitRootMock.mock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mock.mockImplementation(() =>
       Promise.resolve({
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
+        hooks,
       }),
     );
     createWorktreeMock.mock.mockImplementation(() =>
@@ -86,8 +88,7 @@ describe("createWorktreeTool", () => {
         branch: "feature-1",
         base: undefined,
       },
-      undefined,
-      undefined,
+      hooks,
     ]);
 
     strictEqual(result.content.length, 1);
@@ -106,12 +107,14 @@ describe("createWorktreeTool", () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
     const worktreePath = "/path/to/repo/.git/phantom/worktrees/feature-2";
+    const hooks = {};
 
     getGitRootMock.mock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mock.mockImplementation(() =>
       Promise.resolve({
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
+        hooks,
       }),
     );
     createWorktreeMock.mock.mockImplementation(() =>
@@ -132,8 +135,7 @@ describe("createWorktreeTool", () => {
         branch: "feature-2",
         base: "develop",
       },
-      undefined,
-      undefined,
+      hooks,
     ]);
 
     const parsedContent = JSON.parse(result.content[0].text);
@@ -155,6 +157,7 @@ describe("createWorktreeTool", () => {
       Promise.resolve({
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
+        hooks: {},
       }),
     );
     createWorktreeMock.mock.mockImplementation(() =>

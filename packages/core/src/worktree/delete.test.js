@@ -6,6 +6,12 @@ import { WorktreeError, WorktreeNotFoundError } from "./errors.ts";
 const validateWorktreeExistsMock = mock.fn();
 const executeGitCommandMock = mock.fn();
 const executeGitCommandInDirectoryMock = mock.fn();
+const executeHookMock = mock.fn(() =>
+  Promise.resolve({
+    ok: true,
+    value: { executedCommands: [], backgroundCommands: [] },
+  }),
+);
 
 mock.module("./validate.ts", {
   namedExports: {
@@ -17,6 +23,12 @@ mock.module("@aku11i/phantom-git", {
   namedExports: {
     executeGitCommand: executeGitCommandMock,
     executeGitCommandInDirectory: executeGitCommandInDirectoryMock,
+  },
+});
+
+mock.module("../hooks/executor.ts", {
+  namedExports: {
+    executeHook: executeHookMock,
   },
 });
 
@@ -33,6 +45,7 @@ describe("deleteWorktree", () => {
     validateWorktreeExistsMock.mock.resetCalls();
     executeGitCommandMock.mock.resetCalls();
     executeGitCommandInDirectoryMock.mock.resetCalls();
+    executeHookMock.mock.resetCalls();
   };
 
   it("should delete worktree and report when branch deletion fails", async () => {
@@ -61,7 +74,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
     );
 
     strictEqual(isOk(result), true);
@@ -101,7 +114,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
     );
 
     strictEqual(isOk(result), true);
@@ -150,7 +163,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "nonexistent",
       {},
-      undefined,
+      {},
     );
 
     strictEqual(isErr(result), true);
@@ -180,7 +193,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
     );
 
     strictEqual(isErr(result), true);
@@ -224,7 +237,7 @@ describe("deleteWorktree", () => {
       {
         force: true,
       },
-      undefined,
+      {},
     );
 
     strictEqual(isOk(result), true);

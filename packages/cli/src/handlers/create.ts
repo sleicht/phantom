@@ -115,33 +115,30 @@ export async function createHandler(args: string[]): Promise<void> {
       worktreeName = nameResult.value;
     }
 
-    let filesToCopy: string[] = [];
-
-    // Load files from config
-    if (context.config?.postCreate?.copyFiles) {
-      filesToCopy = [...context.config.postCreate.copyFiles];
-    }
-
-    // Add files from CLI options
+    // Merge CLI --copy-file options into hooks
+    const hooks = { ...context.hooks };
     if (copyFileOptions && copyFileOptions.length > 0) {
       const cliFiles = Array.isArray(copyFileOptions)
         ? copyFileOptions
         : [copyFileOptions];
-      // Merge with config files, removing duplicates
-      filesToCopy = [...new Set([...filesToCopy, ...cliFiles])];
+      const existing = hooks["post-create"]?.copyFiles ?? [];
+      const merged = [...new Set([...existing, ...cliFiles])];
+      hooks["post-create"] = { ...hooks["post-create"], copyFiles: merged };
     }
+
+    const filesToCopy = hooks["post-create"]?.copyFiles;
 
     const result = await createWorktreeCore(
       context.gitRoot,
       context.worktreesDirectory,
       worktreeName,
       {
-        copyFiles: filesToCopy.length > 0 ? filesToCopy : undefined,
+        copyFiles:
+          filesToCopy && filesToCopy.length > 0 ? filesToCopy : undefined,
         base: baseOption,
         directoryNameSeparator,
       },
-      filesToCopy.length > 0 ? filesToCopy : undefined,
-      context.config?.postCreate?.commands,
+      hooks,
     );
 
     if (isErr(result)) {

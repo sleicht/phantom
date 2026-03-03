@@ -61,6 +61,7 @@ describe("deleteWorktreeTool", () => {
   it("should delete worktree successfully without force", async () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
+    const hooks = {};
 
     getGitRootMock.mock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mock.mockImplementation(() =>
@@ -68,6 +69,7 @@ describe("deleteWorktreeTool", () => {
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
+        hooks,
       }),
     );
     deleteWorktreeMock.mock.mockImplementation(() =>
@@ -83,7 +85,7 @@ describe("deleteWorktreeTool", () => {
       "/path/to/repo/.git/phantom/worktrees",
       "feature-1",
       { force: undefined },
-      undefined,
+      hooks,
     ]);
 
     strictEqual(result.content.length, 1);
@@ -99,6 +101,7 @@ describe("deleteWorktreeTool", () => {
   it("should delete worktree with force option", async () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
+    const hooks = {};
 
     getGitRootMock.mock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mock.mockImplementation(() =>
@@ -106,6 +109,7 @@ describe("deleteWorktreeTool", () => {
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
+        hooks,
       }),
     );
     deleteWorktreeMock.mock.mockImplementation(() =>
@@ -123,7 +127,7 @@ describe("deleteWorktreeTool", () => {
       "/path/to/repo/.git/phantom/worktrees",
       "feature-2",
       { force: true },
-      undefined,
+      hooks,
     ]);
 
     const parsedContent = JSON.parse(result.content[0].text);
@@ -146,6 +150,7 @@ describe("deleteWorktreeTool", () => {
         gitRoot,
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
+        hooks: {},
       }),
     );
     deleteWorktreeMock.mock.mockImplementation(() =>

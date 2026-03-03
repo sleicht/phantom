@@ -4,6 +4,14 @@ import { describe, it, mock } from "node:test";
 const loadConfigMock = mock.fn();
 const loadPreferencesMock = mock.fn();
 const getWorktreesDirectoryMock = mock.fn();
+const resolveHooksMock = mock.fn((config) => {
+  if (!config) return {};
+  const hooks = {};
+  if (config.postCreate) hooks["post-create"] = config.postCreate;
+  if (config.preDelete) hooks["pre-delete"] = config.preDelete;
+  if (config.hooks) Object.assign(hooks, config.hooks);
+  return hooks;
+});
 
 mock.module("./config/loader.ts", {
   namedExports: {
@@ -23,6 +31,12 @@ mock.module("./paths.ts", {
   },
 });
 
+mock.module("./hooks/resolve.ts", {
+  namedExports: {
+    resolveHooks: resolveHooksMock,
+  },
+});
+
 const { ok, err } = await import("@aku11i/phantom-shared");
 const { createContext } = await import("./context.ts");
 
@@ -31,6 +45,7 @@ describe("createContext", () => {
     loadConfigMock.mock.resetCalls();
     loadPreferencesMock.mock.resetCalls();
     getWorktreesDirectoryMock.mock.resetCalls();
+    resolveHooksMock.mock.resetCalls();
   };
 
   it("uses preferences worktreesDirectory over config and warns about deprecated config usage", async () => {
