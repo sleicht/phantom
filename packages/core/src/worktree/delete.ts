@@ -1,18 +1,21 @@
 import { isAbsolute, relative } from "node:path";
+import type { HooksConfig } from "@phantompane/config";
 import {
   deleteBranch as gitDeleteBranch,
   getStatus,
   removeWorktree as gitRemoveWorktree,
 } from "@phantompane/git";
 import { err, isErr, isOk, ok, type Result } from "@phantompane/utils";
+import { executeHook } from "../hooks/executor.ts";
+import type { WorktreeLogger } from "./action.ts";
 import { WorktreeError, type WorktreeNotFoundError } from "./errors.ts";
-import { executePreDeleteCommands } from "./pre-delete.ts";
 import { validateWorktreeExists } from "./validate.ts";
 
 export interface DeleteWorktreeOptions {
   force?: boolean;
   keepBranch?: boolean;
   path?: string;
+  logger?: WorktreeLogger;
 }
 
 export interface DeleteWorktreeSuccess {
@@ -79,11 +82,12 @@ export async function deleteWorktree(
   worktreeDirectory: string,
   name: string,
   options: DeleteWorktreeOptions,
-  preDeleteCommands: string[] | undefined,
+  hooks: HooksConfig,
+  directoryNameSeparator: string,
 ): Promise<
   Result<DeleteWorktreeSuccess, WorktreeNotFoundError | WorktreeError>
 > {
-  const { force = false } = options || {};
+  const { force = false, logger } = options || {};
   const keepBranch = options?.keepBranch ?? false;
   const validateOptions: { excludeDefault: true; expectedPath?: string } = {
     excludeDefault: true,
@@ -121,15 +125,22 @@ export async function deleteWorktree(
     );
   }
 
-  // Execute pre-delete commands if provided
-  if (preDeleteCommands && preDeleteCommands.length > 0) {
-    console.log("\nRunning pre-delete commands...");
-    const preDeleteResult = await executePreDeleteCommands({
-      gitRoot,
-      worktreesDirectory: worktreeDirectory,
-      worktreeName: name,
-      commands: preDeleteCommands,
-    });
+  const hookContext = {
+    gitRoot,
+    worktreesDirectory: worktreeDirectory,
+    worktreeName: name,
+    directoryNameSeparator,
+    logger,
+  };
+
+  // Execute pre-delete hook (blocking, fail-fast)
+  if (hooks["pre-delete"]) {
+    logger?.log?.("\nRunning pre-delete hooks...");
+    const preDeleteResult = await executeHook(
+      "pre-delete",
+      hooks["pre-delete"],
+      hookContext,
+    );
 
     if (isErr(preDeleteResult)) {
       return err(new WorktreeError(preDeleteResult.error.message));
@@ -155,6 +166,11 @@ export async function deleteWorktree(
 
     if (status.hasUncommittedChanges) {
       message = `Warning: Worktree '${name}' had uncommitted changes (${status.changedFiles} files)\n${message}`;
+    }
+
+    // Execute post-delete hook (background)
+    if (hooks["post-delete"]) {
+      executeHook("post-delete", hooks["post-delete"], hookContext);
     }
 
     return ok({

@@ -98,8 +98,10 @@ export async function deleteHandler(args: string[]): Promise<void> {
         {
           force: forceDelete,
           keepBranch,
+          logger: output,
         },
-        context.config?.preDelete?.commands,
+        context.hooks,
+        context.directoryNameSeparator,
       );
 
       if (isErr(result)) {

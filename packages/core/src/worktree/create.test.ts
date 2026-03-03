@@ -8,40 +8,18 @@ const mkdirMock = vi.fn();
 const validateWorktreeDoesNotExistMock = vi.fn();
 const validateWorktreeNameMock = vi.fn();
 const addWorktreeMock = vi.fn();
-const getWorktreesDirectoryMock = vi.fn((gitRoot, worktreesDirectory) => {
-  if (worktreesDirectory) {
-    // Simulate node.js path.join behavior for resolving relative paths
-    if (worktreesDirectory.startsWith("/")) {
-      return worktreesDirectory;
-    }
-    // For relative paths like "../phantom-external", resolve them correctly
-    if (worktreesDirectory === "../phantom-external") {
-      return "/test/phantom-external";
-    }
-    return `${gitRoot}/${worktreesDirectory}`;
-  }
-  return `${gitRoot}/.git/phantom/worktrees`;
-});
-const getWorktreePathMock = vi.fn((gitRoot, name, worktreesDirectory) => {
-  if (worktreesDirectory) {
-    if (worktreesDirectory.startsWith("/")) {
-      return `${worktreesDirectory}/${name}`;
-    }
-    if (worktreesDirectory === "../phantom-external") {
-      return `/test/phantom-external/${name}`;
-    }
-    return `${gitRoot}/${worktreesDirectory}/${name}`;
-  }
-  return `${gitRoot}/.git/phantom/worktrees/${name}`;
-});
 const getWorktreePathFromDirectoryMock = vi.fn(
-  (worktreeDirectory, name, separator = "/") => {
+  (worktreeDirectory: string, name: string, separator = "/") => {
     const directoryName =
       separator === "/" ? name : name.replaceAll("/", separator);
     return `${worktreeDirectory}/${directoryName}`;
   },
 );
 const copyFilesMock = vi.fn();
+const executeHookMock = vi.fn(
+  (_hookType: string, _hookConfig: unknown, _context: unknown) =>
+    Promise.resolve(ok({ executedCommands: [], backgroundCommands: [] })),
+);
 
 vi.doMock("node:fs/promises", () => {
   const mockedFs = {
@@ -69,13 +47,15 @@ vi.doMock("@phantompane/git", () => ({
 }));
 
 vi.doMock("../paths.ts", () => ({
-  getWorktreesDirectory: getWorktreesDirectoryMock,
-  getWorktreePath: getWorktreePathMock,
   getWorktreePathFromDirectory: getWorktreePathFromDirectoryMock,
 }));
 
 vi.doMock("./file-copier.ts", () => ({
   copyFiles: copyFilesMock,
+}));
+
+vi.doMock("../hooks/executor.ts", () => ({
+  executeHook: executeHookMock,
 }));
 
 const { createWorktree } = await import("./create.ts");
@@ -87,10 +67,9 @@ describe("createWorktree", () => {
     validateWorktreeDoesNotExistMock.mockClear();
     validateWorktreeNameMock.mockClear();
     addWorktreeMock.mockClear();
-    getWorktreesDirectoryMock.mockClear();
-    getWorktreePathMock.mockClear();
     getWorktreePathFromDirectoryMock.mockClear();
     copyFilesMock.mockClear();
+    executeHookMock.mockClear();
   };
 
   it("should create worktree successfully", async () => {
@@ -109,8 +88,7 @@ describe("createWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature-branch",
       {},
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -151,8 +129,7 @@ describe("createWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "new-feature",
       {},
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -175,8 +152,7 @@ describe("createWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "existing",
       {},
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -205,8 +181,7 @@ describe("createWorktree", () => {
         branch: "custom-branch",
         base: "main",
       },
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -232,8 +207,7 @@ describe("createWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "bad-branch",
       {},
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -261,8 +235,7 @@ describe("createWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature/test",
       {},
-      undefined,
-      undefined,
+      {},
       "-",
     );
 
@@ -280,7 +253,7 @@ describe("createWorktree", () => {
     }
   });
 
-  it("merges explicit and post-create copy files without duplicates", async () => {
+  it("merges explicit and post-create hook copy files without duplicates", async () => {
     resetMocks();
     accessMock.mockImplementation(() => Promise.resolve());
     validateWorktreeNameMock.mockImplementation(() => ok(undefined));
@@ -304,8 +277,7 @@ describe("createWorktree", () => {
       {
         copyFiles: [".env", "config.json"],
       },
-      [".env", ".npmrc"],
-      undefined,
+      { "post-create": { copyFiles: [".env", ".npmrc"] } },
       "/",
     );
 
@@ -313,8 +285,10 @@ describe("createWorktree", () => {
     deepStrictEqual(copyFilesMock.mock.calls[0], [
       "/test/repo",
       "/test/repo/.git/phantom/worktrees/feature",
-      [".env", "config.json", ".npmrc"],
+      [".env", ".npmrc", "config.json"],
     ]);
+    // the hook config passed to the executor has copyFiles stripped
+    deepStrictEqual(executeHookMock.mock.calls[1][1], {});
   });
 
   describe("with different worktree directories", () => {
@@ -337,8 +311,7 @@ describe("createWorktree", () => {
         "/test/phantom-external",
         "feature-branch",
         {},
-        undefined,
-        undefined,
+        {},
         "/",
       );
 
@@ -381,8 +354,7 @@ describe("createWorktree", () => {
         "/tmp/phantom-worktrees",
         "feature-branch",
         {},
-        undefined,
-        undefined,
+        {},
         "/",
       );
 
@@ -418,8 +390,7 @@ describe("createWorktree", () => {
         "/test/phantom-external",
         "feature-branch",
         {},
-        undefined,
-        undefined,
+        {},
         "/",
       );
 

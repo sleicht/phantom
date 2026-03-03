@@ -13,7 +13,10 @@ const getWorktreePathFromDirectoryMock = vi.fn(
 );
 const validateWorktreeNameMock = vi.fn();
 const copyFilesMock = vi.fn();
-const executePostCreateCommandsMock = vi.fn();
+const executeHookMock = vi.fn(
+  (_hookType: string, _hookConfig: unknown, _context: unknown) =>
+    Promise.resolve(ok({ executedCommands: [], backgroundCommands: [] })),
+);
 const execInWorktreeMock = vi.fn();
 
 const originalProcessEnv = process.env;
@@ -46,8 +49,8 @@ vi.doMock("./validate.ts", () => ({
   validateWorktreeName: validateWorktreeNameMock,
 }));
 
-vi.doMock("./post-create.ts", () => ({
-  executePostCreateCommands: executePostCreateCommandsMock,
+vi.doMock("../hooks/executor.ts", () => ({
+  executeHook: executeHookMock,
 }));
 
 vi.doMock("./file-copier.ts", () => ({
@@ -83,7 +86,7 @@ describe("runAttachWorktree", () => {
     getWorktreePathFromDirectoryMock.mockClear();
     validateWorktreeNameMock.mockReset();
     copyFilesMock.mockReset();
-    executePostCreateCommandsMock.mockReset();
+    executeHookMock.mockClear();
     execInWorktreeMock.mockReset();
 
     for (const key of Object.keys(processEnvMock)) {
@@ -102,22 +105,20 @@ describe("runAttachWorktree", () => {
       gitRoot: "/repo",
       worktreesDirectory: "/repo/.git/phantom/worktrees",
       directoryNameSeparator: "/",
-      config: {
-        postCreate: {
+      config: null,
+      preferences: {},
+      hooks: {
+        "post-create": {
           copyFiles: [".env"],
           commands: ["npm install"],
         },
       },
-      preferences: {},
     });
     copyFilesMock.mockResolvedValue(
       ok({
         copiedFiles: [".env", "config.json"],
         skippedFiles: [],
       }),
-    );
-    executePostCreateCommandsMock.mockResolvedValue(
-      ok({ executedCommands: ["npm install"] }),
     );
     const logger = {
       log: vi.fn(),
@@ -131,15 +132,14 @@ describe("runAttachWorktree", () => {
     });
 
     strictEqual(result.ok, true);
-    deepStrictEqual(copyFilesMock.mock.calls[0], [
-      "/repo",
-      "/repo/.git/phantom/worktrees/feature",
-      [".env", "config.json"],
-    ]);
-    strictEqual(
-      logger.log.mock.calls[0][0],
-      "\nRunning post-create commands...",
+    const postCreateCall = executeHookMock.mock.calls.find(
+      (call) => call[0] === "post-create",
     );
+    deepStrictEqual(postCreateCall?.[1], {
+      copyFiles: [".env", "config.json"],
+      commands: ["npm install"],
+    });
+    strictEqual(logger.log.mock.calls[0][0], "\nRunning post-create hooks...");
     strictEqual(logger.log.mock.calls[1][0], "Attached phantom: feature");
   });
 
@@ -157,6 +157,7 @@ describe("runAttachWorktree", () => {
       directoryNameSeparator: "/",
       config: null,
       preferences: {},
+      hooks: {},
     });
     execInWorktreeMock.mockResolvedValue(ok({ exitCode: 0 }));
     const logger = {

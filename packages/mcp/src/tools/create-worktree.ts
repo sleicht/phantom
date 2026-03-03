@@ -16,8 +16,11 @@ const schema = z.object({
 
 export const createWorktreeTool: Tool<typeof schema> = {
   name: "phantom_create_worktree",
+
   description: "Create a new Git worktree (phantom)",
+
   inputSchema: schema,
+
   handler: async ({ name, baseBranch }) => {
     const gitRoot = await getGitRoot();
     const context = await createContext(gitRoot);
@@ -28,10 +31,8 @@ export const createWorktreeTool: Tool<typeof schema> = {
       {
         branch: name,
         base: baseBranch,
-        copyFiles: context.config?.postCreate?.copyFiles,
       },
-      undefined,
-      context.config?.postCreate?.commands,
+      context.hooks,
       context.directoryNameSeparator,
     );
 

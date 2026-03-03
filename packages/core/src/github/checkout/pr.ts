@@ -104,8 +104,7 @@ export async function checkoutPullRequest(
     context.gitRoot,
     context.worktreesDirectory,
     worktreeName,
-    context.config?.postCreate?.copyFiles,
-    context.config?.postCreate?.commands,
+    context.hooks,
     context.directoryNameSeparator,
   );
 

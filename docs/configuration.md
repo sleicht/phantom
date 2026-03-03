@@ -3,15 +3,18 @@
 ## Table of Contents
 
 - [Configuration File](#configuration-file)
-- [Configuration Options](#configuration-options)
-  - [worktreesDirectory](#worktreebasedirectory)
+- [Hooks](#hooks)
+  - [Hook Types](#hook-types)
+  - [Hook Options](#hook-options)
+  - [copyFiles](#copyfiles)
+  - [Commands](#commands)
+- [Legacy Configuration](#legacy-configuration)
+- [Other Options](#other-options)
+  - [worktreesDirectory](#worktreesdirectory)
   - [directoryNameSeparator](#directorynameseparator)
-  - [postCreate.copyFiles](#postcreatecopyfiles)
-  - [postCreate.commands](#postcreatecommands)
-  - [preDelete.commands](#predeletecommands)
 - [Global Preferences](#global-preferences)
 
-Phantom supports configuration through a `phantom.config.json` file in your repository root. This allows you to define project-level defaults such as where worktrees are stored, which files are copied, and which commands are executed when creating new worktrees. For personal defaults, use `phantom preferences` (stored in your global git config).
+Phantom supports configuration through a `phantom.config.json` file in your repository root. This allows you to define lifecycle hooks that run at various stages of worktree creation and deletion. For personal defaults such as `worktreesDirectory`, prefer `phantom preferences` (stored in your global git config); the `worktreesDirectory` key in `phantom.config.json` is deprecated and will be removed in the next version.
 
 ## Configuration File
 
@@ -19,140 +22,85 @@ Create a `phantom.config.json` file in your repository root:
 
 ```json
 {
-  "worktreesDirectory": "../phantom-worktrees",
-  "directoryNameSeparator": "-",
-  "postCreate": {
-    "copyFiles": [".env", ".env.local", "config/local.json"],
-    "commands": ["pnpm install", "pnpm build"]
-  },
-  "preDelete": {
-    "commands": ["docker compose down"]
+  "hooks": {
+    "post-create": {
+      "copyFiles": [".env", ".env.local"],
+      "commands": ["pnpm install", "pnpm build"]
+    },
+    "post-start": {
+      "commands": ["pnpm dev"]
+    },
+    "pre-delete": {
+      "commands": ["docker compose down"]
+    },
+    "post-delete": {
+      "commands": ["echo 'cleaned up'"]
+    }
   }
 }
 ```
 
-## Configuration Options
+## Hooks
 
-### worktreesDirectory
+Hooks are lifecycle commands that run at specific stages of worktree operations. Each hook type has default behaviour for whether it runs in the foreground (blocking) or background, and whether it stops on the first error (fail-fast).
 
-A custom base directory where Phantom worktrees will be created. By default, Phantom creates all worktrees in `.git/phantom/worktrees/`. Set this in `phantom.config.json` for a project-wide location, or in `phantom preferences` for a personal default.
+### Hook Types
 
-**Use Cases:**
+| Hook          | When                     | Blocking        | Fail-fast | copyFiles |
+| ------------- | ------------------------ | --------------- | --------- | --------- |
+| `pre-create`  | Before worktree creation | Yes             | Yes       | No        |
+| `post-create` | After worktree created   | Yes             | No        | Yes       |
+| `post-start`  | After worktree created   | No (background) | No        | Yes       |
+| `pre-delete`  | Before worktree removed  | Yes             | Yes       | No        |
+| `post-delete` | After worktree removed   | No (background) | No        | No        |
 
-- Store worktrees outside the main repository directory
-- Use a shared location for multiple repositories
-- Keep worktrees on a different filesystem or drive
-- Organize worktrees in a custom directory structure
+**Blocking** hooks run in the foreground — the CLI waits for them to complete before continuing. **Background** hooks are fire-and-forget — the CLI returns immediately while the command continues running.
 
-**Examples:**
+**Fail-fast** hooks stop on the first failed command and abort the operation. Non-fail-fast hooks attempt all commands and report errors at the end.
 
-**Relative path (relative to repository root):**
+**Future hook types** (`pre-switch`, `post-switch`, `pre-commit`, `pre-merge`, `post-merge`) are accepted in configuration but not yet wired up. They will emit an info message if configured.
 
-```json
-{
-  "worktreesDirectory": "../phantom-worktrees"
-}
-```
+### Hook Options
 
-This creates worktrees directly in `../phantom-worktrees/` (e.g., `../phantom-worktrees/feature-1`)
-
-**Absolute path:**
+Each hook can have the following options:
 
 ```json
 {
-  "worktreesDirectory": "/tmp/my-phantom-worktrees"
+  "hooks": {
+    "post-create": {
+      "commands": ["pnpm install"],
+      "copyFiles": [".env"],
+      "background": false,
+      "failFast": true
+    }
+  }
 }
 ```
 
-This creates worktrees directly in `/tmp/my-phantom-worktrees/` (e.g., `/tmp/my-phantom-worktrees/feature-1`)
+- **commands** — Array of shell commands to execute
+- **copyFiles** — Array of file paths/glob patterns to copy (only for `post-create` and `post-start`)
+- **background** — Override the default blocking/background behaviour
+- **failFast** — Override the default fail-fast behaviour
 
-**Directory Structure:**
-With `worktreesDirectory` set to `../phantom-worktrees`, your directory structure will look like:
+### copyFiles
 
-```
-parent-directory/
-├── your-project/           # Git repository
-│   ├── .git/
-│   ├── phantom.config.json
-│   └── ...
-└── phantom-worktrees/      # Custom worktree location
-    ├── feature-1/
-    ├── feature-2/
-    └── bugfix-login/
-```
-
-**Notes:**
-
-- If `worktreesDirectory` is not specified, defaults to `.git/phantom/worktrees`
-- Use a path relative to the Git repository root (relative paths are resolved from the repo root; absolute paths are used as-is)
-- The directory will be created automatically if it doesn't exist
-- When worktreesDirectory is specified, worktrees are created directly in that directory
-- `phantom.config.json` is project-level configuration, while `phantom preferences` stores per-user defaults
-- If both are set, `phantom preferences` takes precedence over `phantom.config.json`
-
-### directoryNameSeparator
-
-Controls how `/` in worktree names is mapped to the filesystem directory name. By default, Phantom keeps `/`, which creates nested directories. Set this in `phantom.config.json` for a project-wide default, or in `phantom preferences` for a personal default.
-
-**Use Cases:**
-
-- Keep all worktrees at one directory level for easier browsing
-- Preserve branch naming conventions like `feature/test` while storing directories as `feature-test`
-- Use a separator that matches team conventions such as `-` or `_`
-
-**Examples:**
-
-**Flat directories with hyphens:**
-
-```json
-{
-  "directoryNameSeparator": "-"
-}
-```
-
-This maps `feature/test` to `feature-test` on disk while the Git branch remains `feature/test`.
-
-**Flat directories with underscores:**
-
-```json
-{
-  "directoryNameSeparator": "_"
-}
-```
-
-This maps `release/2026/q1` to `release_2026_q1`.
-
-**Notes:**
-
-- If `directoryNameSeparator` is not specified, Phantom keeps the current behavior and uses `/`
-- Only the directory name is transformed; the Git branch name is unchanged
-- `phantom preferences` takes precedence over `phantom.config.json` when both are set
-- This affects worktree creation paths only
-
-### postCreate.copyFiles
-
-An array of file paths or glob patterns to automatically copy from the current worktree to newly created worktrees.
+An array of file paths to automatically copy from the current worktree to newly created worktrees. Only supported in `post-create` and `post-start` hooks.
 
 **Use Cases:**
 
 - Environment configuration files (`.env`, `.env.local`)
-- Local development settings across subdirectories
+- Local development settings
 - Secret files that are gitignored
 - Database configuration files
-- API keys and certificates
 
 **Example:**
 
 ```json
 {
-  "postCreate": {
-    "copyFiles": [
-      ".env",
-      ".env*",
-      "config/database.local.yml",
-      "config/**/*.local.yml",
-      "secrets/[ab]*.json"
-    ]
+  "hooks": {
+    "post-create": {
+      "copyFiles": [".env", ".env.local", "config/database.local.yml"]
+    }
   }
 }
 ```
@@ -185,24 +133,21 @@ Phantom resolves `copyFiles` patterns with these options:
 - Overlapping patterns are automatically deduplicated
 - Can be overridden with `--copy-file` command line options
 
-### postCreate.commands
+### Commands
 
-An array of commands to execute after creating a new worktree.
-
-**Use Cases:**
-
-- Installing dependencies
-- Building the project
-- Setting up the development environment
-- Running database migrations
-- Generating configuration files
+An array of commands to execute at the hook's lifecycle stage.
 
 **Example:**
 
 ```json
 {
-  "postCreate": {
-    "commands": ["pnpm install", "pnpm db:migrate", "pnpm db:seed"]
+  "hooks": {
+    "post-create": {
+      "commands": ["pnpm install", "pnpm db:migrate", "pnpm db:seed"]
+    },
+    "pre-delete": {
+      "commands": ["docker compose down"]
+    }
   }
 }
 ```
@@ -210,9 +155,59 @@ An array of commands to execute after creating a new worktree.
 **Notes:**
 
 - Commands are executed in order
-- Execution stops on the first failed command
-- Commands run in the new worktree's directory
-- Output is displayed in real-time
+- Commands run in the worktree's directory
+- Output is displayed in real-time (foreground hooks only)
+- For `pre-create` and `pre-delete` hooks: execution stops on the first failed command (fail-fast) and the operation is aborted
+- For `post-create` hooks: all commands are attempted; errors are collected and reported
+- For `post-start` and `post-delete` hooks: commands are spawned in the background
+
+## Legacy Configuration
+
+The following format is still accepted but deprecated. A warning will be emitted when legacy keys are used.
+
+```json
+{
+  "postCreate": {
+    "copyFiles": [".env"],
+    "commands": ["pnpm install"]
+  },
+  "preDelete": {
+    "commands": ["docker compose down"]
+  }
+}
+```
+
+**Migration:** Move `postCreate` to `hooks["post-create"]` and `preDelete` to `hooks["pre-delete"]`. The new `hooks` format takes precedence if both are present.
+
+## Other Options
+
+### worktreesDirectory
+
+> **Deprecated:** Use `phantom preferences set worktreesDirectory <path>` instead.
+
+A custom base directory where Phantom worktrees will be created. By default, Phantom creates all worktrees in `.git/phantom/worktrees/`.
+
+**Examples:**
+
+```json
+{
+  "worktreesDirectory": "../phantom-worktrees"
+}
+```
+
+### directoryNameSeparator
+
+A string used to flatten worktree directory names that contain slashes. When set, slashes in worktree names are replaced with this separator instead of creating nested directories.
+
+**Example:**
+
+```json
+{
+  "directoryNameSeparator": "-"
+}
+```
+
+With this setting, a worktree named `feature/my-branch` would be created at `worktrees/feature-my-branch` instead of `worktrees/feature/my-branch`.
 
 ## Global Preferences
 
@@ -262,30 +257,3 @@ phantom preferences remove ghqDiscovery
 ```
 
 If ghq is not installed, project listing continues with Phantom's native registry without an error. If ghq is installed but discovery fails, project listing is a partial success: the command exits successfully, returns native registry entries, and writes a warning only to stderr. In `--json` mode, stdout remains a valid version 2 project catalog.
-
-### preDelete.commands
-
-An array of commands to execute in a worktree **before** it is deleted. Use this to gracefully shut down resources or clean up artifacts that were created in the worktree.
-
-**Use Cases:**
-
-- Stop background services started from the worktree (e.g., `docker compose down`)
-- Remove generated assets or caches before deletion
-- Run custom teardown scripts
-
-**Example:**
-
-```json
-{
-  "preDelete": {
-    "commands": ["docker compose down"]
-  }
-}
-```
-
-**Notes:**
-
-- Commands run in the worktree being deleted
-- Commands are executed in order and halt on the first failure
-- If a command fails, the worktree is **not** removed
-- Output is displayed in real-time

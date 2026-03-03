@@ -8,9 +8,13 @@ const existsSyncMock = vi.fn();
 const branchExistsMock = vi.fn();
 const addWorktreeMock = vi.fn();
 const getWorktreePathFromDirectoryMock = vi.fn(
-  (worktreeDirectory: string, name: string, directoryNameSeparator = "/") => {
-    return `${worktreeDirectory}/${name.replaceAll("/", directoryNameSeparator)}`;
+  (worktreeDirectory: string, name: string) => {
+    return `${worktreeDirectory}/${name}`;
   },
+);
+const executeHookMock = vi.fn(
+  (_hookType: string, _hookConfig: unknown, _context: unknown) =>
+    Promise.resolve(ok({ executedCommands: [], backgroundCommands: [] })),
 );
 
 vi.doMock("./validate.ts", () => ({
@@ -34,6 +38,10 @@ vi.doMock("../paths.ts", () => ({
   getWorktreePathFromDirectory: getWorktreePathFromDirectoryMock,
 }));
 
+vi.doMock("../hooks/executor.ts", () => ({
+  executeHook: executeHookMock,
+}));
+
 const { attachWorktreeCore } = await import("./attach.ts");
 
 describe("attachWorktreeCore", () => {
@@ -43,6 +51,7 @@ describe("attachWorktreeCore", () => {
     branchExistsMock.mockClear();
     addWorktreeMock.mockClear();
     getWorktreePathFromDirectoryMock.mockClear();
+    executeHookMock.mockClear();
   };
 
   it("should attach to existing branch successfully", async () => {
@@ -56,8 +65,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature-branch",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -97,8 +105,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature/branch",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -123,8 +130,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "existing-feature",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -150,8 +156,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "non-existent",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -177,8 +182,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -200,8 +204,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature",
-      undefined,
-      undefined,
+      {},
       "/",
     );
 
@@ -228,8 +231,7 @@ describe("attachWorktreeCore", () => {
       "/repo",
       "/repo/.git/phantom/worktrees",
       "feature/test",
-      undefined,
-      undefined,
+      {},
       "-",
     );
 

@@ -71,6 +71,7 @@ describe("deleteWorktreeTool", () => {
   it("should delete worktree successfully without force", async () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
+    const hooks = {};
 
     getGitRootMock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mockImplementation(() =>
@@ -79,6 +80,8 @@ describe("deleteWorktreeTool", () => {
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
         preferences: {},
+        directoryNameSeparator: "/",
+        hooks,
       }),
     );
     deleteWorktreeMock.mockImplementation(() => Promise.resolve(okMock({})));
@@ -95,7 +98,8 @@ describe("deleteWorktreeTool", () => {
       "/path/to/repo/.git/phantom/worktrees",
       "feature-1",
       { force: undefined, keepBranch: undefined },
-      undefined,
+      hooks,
+      "/",
     ]);
 
     strictEqual(result.content.length, 1);
@@ -111,6 +115,7 @@ describe("deleteWorktreeTool", () => {
   it("should delete worktree with force option", async () => {
     resetMocks();
     const gitRoot = "/path/to/repo";
+    const hooks = {};
 
     getGitRootMock.mockImplementation(() => Promise.resolve(gitRoot));
     createContextMock.mockImplementation(() =>
@@ -119,6 +124,8 @@ describe("deleteWorktreeTool", () => {
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
         preferences: {},
+        directoryNameSeparator: "/",
+        hooks,
       }),
     );
     deleteWorktreeMock.mockImplementation(() => Promise.resolve(okMock({})));
@@ -137,7 +144,8 @@ describe("deleteWorktreeTool", () => {
       "/path/to/repo/.git/phantom/worktrees",
       "feature-2",
       { force: true, keepBranch: undefined },
-      undefined,
+      hooks,
+      "/",
     ]);
 
     const parsedContent = JSON.parse(getTextContent(result));
@@ -161,6 +169,8 @@ describe("deleteWorktreeTool", () => {
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
         preferences: {},
+        directoryNameSeparator: "/",
+        hooks: {},
       }),
     );
     deleteWorktreeMock.mockImplementation(() => Promise.resolve(errorResult));
@@ -217,6 +227,8 @@ describe("deleteWorktreeTool", () => {
         worktreesDirectory: "/path/to/repo/.git/phantom/worktrees",
         config: null,
         preferences: { keepBranch: true },
+        directoryNameSeparator: "/",
+        hooks: {},
       }),
     );
     deleteWorktreeMock.mockImplementation(() => Promise.resolve(okMock({})));
@@ -228,7 +240,8 @@ describe("deleteWorktreeTool", () => {
       "/path/to/repo/.git/phantom/worktrees",
       "feature-3",
       { force: undefined, keepBranch: true },
-      undefined,
+      {},
+      "/",
     ]);
   });
 });

@@ -8,6 +8,13 @@ const getStatusMock = vi.fn();
 const removeWorktreeMock = vi.fn();
 const deleteBranchMock = vi.fn();
 
+const executeHookMock = vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    value: { executedCommands: [], backgroundCommands: [] },
+  }),
+);
+
 vi.doMock("./validate.ts", () => ({
   validateWorktreeExists: validateWorktreeExistsMock,
 }));
@@ -16,6 +23,10 @@ vi.doMock("@phantompane/git", () => ({
   getStatus: getStatusMock,
   removeWorktree: removeWorktreeMock,
   deleteBranch: deleteBranchMock,
+}));
+
+vi.doMock("../hooks/executor.ts", () => ({
+  executeHook: executeHookMock,
 }));
 
 const {
@@ -64,7 +75,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isOk(result), true);
@@ -90,7 +102,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isOk(result), true);
@@ -137,7 +150,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       { keepBranch: true },
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isOk(result), true);
@@ -164,7 +178,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "abc1234",
       { path: "/test/repo/.git/phantom/worktrees/second" },
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isOk(result), true);
@@ -197,7 +212,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isErr(result), true);
@@ -222,7 +238,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "missing",
       {},
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isErr(result), true);
@@ -243,7 +260,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isErr(result), true);
@@ -269,7 +287,8 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       { force: true },
-      undefined,
+      {},
+      "/",
     );
 
     strictEqual(isOk(result), true);

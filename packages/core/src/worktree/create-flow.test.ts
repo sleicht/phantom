@@ -15,7 +15,10 @@ const getWorktreePathFromDirectoryMock = vi.fn(
     `${worktreeDirectory}/${name.replaceAll("/", separator)}`,
 );
 const copyFilesMock = vi.fn();
-const executePostCreateCommandsMock = vi.fn();
+const executeHookMock = vi.fn(
+  (_hookType: string, _hookConfig: unknown, _context: unknown) =>
+    Promise.resolve(ok({ executedCommands: [], backgroundCommands: [] })),
+);
 const isInsideTmuxMock = vi.fn();
 const executeTmuxCommandMock = vi.fn();
 const getPhantomEnvMock = vi.fn();
@@ -66,8 +69,8 @@ vi.doMock("./file-copier.ts", () => ({
   copyFiles: copyFilesMock,
 }));
 
-vi.doMock("./post-create.ts", () => ({
-  executePostCreateCommands: executePostCreateCommandsMock,
+vi.doMock("../hooks/executor.ts", () => ({
+  executeHook: executeHookMock,
 }));
 
 vi.doMock("@phantompane/process", () => ({
@@ -93,7 +96,7 @@ describe("runCreateWorktree", () => {
     generateUniqueNameMock.mockReset();
     getWorktreePathFromDirectoryMock.mockClear();
     copyFilesMock.mockReset();
-    executePostCreateCommandsMock.mockReset();
+    executeHookMock.mockClear();
     isInsideTmuxMock.mockReset();
     executeTmuxCommandMock.mockReset();
     getPhantomEnvMock.mockReset();
@@ -114,13 +117,14 @@ describe("runCreateWorktree", () => {
       gitRoot: "/repo",
       worktreesDirectory: "/repo/.git/phantom/worktrees",
       directoryNameSeparator: "-",
-      config: {
-        postCreate: {
+      config: null,
+      preferences: {},
+      hooks: {
+        "post-create": {
           copyFiles: [".env"],
           commands: ["npm install"],
         },
       },
-      preferences: {},
     });
     generateUniqueNameMock.mockResolvedValue(ok("fuzzy-cats-dance"));
     copyFilesMock.mockResolvedValue(
@@ -128,9 +132,6 @@ describe("runCreateWorktree", () => {
         copiedFiles: [".env", "config.json"],
         skippedFiles: [],
       }),
-    );
-    executePostCreateCommandsMock.mockResolvedValue(
-      ok({ executedCommands: ["npm install"] }),
     );
     const logger = {
       log: vi.fn(),
@@ -179,6 +180,7 @@ describe("runCreateWorktree", () => {
       directoryNameSeparator: "/",
       config: null,
       preferences: {},
+      hooks: {},
     });
 
     const result = await runCreateWorktree({
@@ -231,6 +233,7 @@ describe("runCreateWorktree", () => {
       directoryNameSeparator: "/",
       config: null,
       preferences: {},
+      hooks: {},
     });
     copyFilesMock.mockResolvedValue(
       ok({

@@ -1,6 +1,11 @@
-import { loadConfig, type PhantomConfig } from "@phantompane/config";
+import {
+  type HooksConfig,
+  loadConfig,
+  type PhantomConfig,
+} from "@phantompane/config";
 import { loadPreferences, type Preferences } from "@phantompane/preferences";
 import { isOk } from "@phantompane/utils";
+import { resolveHooks } from "./hooks/resolve.ts";
 import { getWorktreesDirectory } from "./paths.ts";
 
 export interface Context {
@@ -9,6 +14,7 @@ export interface Context {
   directoryNameSeparator: string;
   config: PhantomConfig | null;
   preferences: Preferences;
+  hooks: HooksConfig;
 }
 
 export async function createContext(gitRoot: string): Promise<Context> {
@@ -28,5 +34,6 @@ export async function createContext(gitRoot: string): Promise<Context> {
     directoryNameSeparator,
     config,
     preferences,
+    hooks: resolveHooks(config),
   };
 }

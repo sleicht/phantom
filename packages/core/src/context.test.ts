@@ -5,7 +5,8 @@ const loadConfigMock = vi.fn();
 const loadPreferencesMock = vi.fn();
 const getWorktreesDirectoryMock = vi.fn();
 
-vi.doMock("@phantompane/config", () => ({
+vi.doMock("@phantompane/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@phantompane/config")>()),
   loadConfig: loadConfigMock,
 }));
 

@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
-import { getGitRoot, addWorktree, branchExists } from "@phantompane/git";
+import type { HooksConfig } from "@phantompane/config";
+import { addWorktree, branchExists, getGitRoot } from "@phantompane/git";
 import { err, isErr, ok, type Result } from "@phantompane/utils";
 import { createContext } from "../context.ts";
+import { executeHook } from "../hooks/executor.ts";
 import { getWorktreePathFromDirectory } from "../paths.ts";
 import {
-  mergeWorktreeCopyFiles,
   resolveWorktreeAction,
   runWorktreeAction,
   validateWorktreeAction,
@@ -16,8 +17,6 @@ import {
   WorktreeAlreadyExistsError,
   WorktreeError,
 } from "./errors.ts";
-import { copyFiles } from "./file-copier.ts";
-import { executePostCreateCommands } from "./post-create.ts";
 import { validateWorktreeName } from "./validate.ts";
 
 export interface RunAttachWorktreeOptions {
@@ -36,8 +35,7 @@ export async function attachWorktreeCore(
   gitRoot: string,
   worktreeDirectory: string,
   name: string,
-  postCreateCopyFiles: string[] | undefined,
-  postCreateCommands: string[] | undefined,
+  hooks: HooksConfig,
   directoryNameSeparator: string,
   logger?: WorktreeLogger,
 ): Promise<Result<string, Error>> {
@@ -51,6 +49,15 @@ export async function attachWorktreeCore(
     name,
     directoryNameSeparator,
   );
+
+  const hookContext = {
+    gitRoot,
+    worktreesDirectory: worktreeDirectory,
+    worktreeName: name,
+    directoryNameSeparator,
+    logger,
+  };
+
   if (existsSync(worktreePath)) {
     return err(new WorktreeAlreadyExistsError(name));
   }
@@ -62,6 +69,16 @@ export async function attachWorktreeCore(
 
   if (!branchCheckResult.value) {
     return err(new BranchNotFoundError(name));
+  }
+
+  // Execute pre-create hook (blocking, fail-fast)
+  const preCreateResult = await executeHook(
+    "pre-create",
+    hooks["pre-create"],
+    hookContext,
+  );
+  if (isErr(preCreateResult)) {
+    return err(new WorktreeError(preCreateResult.error.message));
   }
 
   try {
@@ -79,31 +96,22 @@ export async function attachWorktreeCore(
     );
   }
 
-  if (postCreateCopyFiles && postCreateCopyFiles.length > 0) {
-    const copyResult = await copyFiles(
-      gitRoot,
-      worktreePath,
-      postCreateCopyFiles,
+  // Execute post-create hook (blocking)
+  if (hooks["post-create"]) {
+    logger?.log?.("\nRunning post-create hooks...");
+    const postCreateResult = await executeHook(
+      "post-create",
+      hooks["post-create"],
+      hookContext,
     );
-    if (isErr(copyResult)) {
-      logger?.warn?.(
-        `Warning: Failed to copy some files: ${copyResult.error.message}`,
-      );
+    if (isErr(postCreateResult)) {
+      return err(new WorktreeError(postCreateResult.error.message));
     }
   }
 
-  if (postCreateCommands && postCreateCommands.length > 0) {
-    logger?.log?.("\nRunning post-create commands...");
-    const commandsResult = await executePostCreateCommands({
-      gitRoot,
-      worktreesDirectory: worktreeDirectory,
-      worktreeName: name,
-      commands: postCreateCommands,
-      logger,
-    });
-    if (isErr(commandsResult)) {
-      return err(new WorktreeError(commandsResult.error.message));
-    }
+  // Execute post-start hook (background)
+  if (hooks["post-start"]) {
+    executeHook("post-start", hooks["post-start"], hookContext);
   }
 
   return ok(worktreePath);
@@ -126,8 +134,8 @@ export async function runAttachWorktree(
     const gitRoot = await getGitRoot();
     const context = await createContext(gitRoot);
 
-    const filesToCopy = mergeWorktreeCopyFiles(
-      context.config?.postCreate?.copyFiles,
+    const hooks = mergeCopyFilesIntoPostCreateHook(
+      context.hooks,
       options.copyFiles,
     );
 
@@ -135,8 +143,7 @@ export async function runAttachWorktree(
       context.gitRoot,
       context.worktreesDirectory,
       options.name,
-      filesToCopy,
-      context.config?.postCreate?.commands,
+      hooks,
       context.directoryNameSeparator,
       options.logger,
     );
@@ -165,4 +172,23 @@ export async function runAttachWorktree(
   } catch (error) {
     return err(error instanceof Error ? error : new Error(String(error)));
   }
+}
+
+function mergeCopyFilesIntoPostCreateHook(
+  hooks: HooksConfig,
+  requestedCopyFiles: string[] | undefined,
+): HooksConfig {
+  if (!requestedCopyFiles || requestedCopyFiles.length === 0) {
+    return hooks;
+  }
+
+  const postCreate = hooks["post-create"];
+  const copyFiles = [
+    ...new Set([...(postCreate?.copyFiles ?? []), ...requestedCopyFiles]),
+  ];
+
+  return {
+    ...hooks,
+    "post-create": { ...postCreate, copyFiles },
+  };
 }

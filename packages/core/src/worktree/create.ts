@@ -1,9 +1,10 @@
 import fs from "node:fs/promises";
-import { getGitRoot, addWorktree } from "@phantompane/git";
+import type { HooksConfig } from "@phantompane/config";
+import { addWorktree, getGitRoot } from "@phantompane/git";
 import { err, isErr, isOk, ok, type Result } from "@phantompane/utils";
 import { createContext } from "../context.ts";
+import { executeHook } from "../hooks/executor.ts";
 import { getWorktreePathFromDirectory } from "../paths.ts";
-import { executePostCreateCommands } from "./post-create.ts";
 import {
   mergeWorktreeCopyFiles,
   resolveWorktreeAction,
@@ -12,8 +13,8 @@ import {
   type WorktreeActionOptions,
   type WorktreeLogger,
 } from "./action.ts";
-import { copyFiles } from "./file-copier.ts";
 import { type WorktreeAlreadyExistsError, WorktreeError } from "./errors.ts";
+import { copyFiles } from "./file-copier.ts";
 import { generateUniqueName } from "./generate-name.ts";
 import {
   validateWorktreeDoesNotExist,
@@ -57,8 +58,7 @@ export async function createWorktree(
   worktreeDirectory: string,
   name: string,
   options: CreateWorktreeOptions,
-  postCreateCopyFiles: string[] | undefined,
-  postCreateCommands: string[] | undefined,
+  hooks: HooksConfig,
   directoryNameSeparator: string,
 ): Promise<
   Result<CreateWorktreeSuccess, WorktreeAlreadyExistsError | WorktreeError>
@@ -80,6 +80,24 @@ export async function createWorktree(
     name,
     directoryNameSeparator,
   );
+
+  const hookContext = {
+    gitRoot,
+    worktreesDirectory: worktreeDirectory,
+    worktreeName: name,
+    directoryNameSeparator,
+    logger,
+  };
+
+  // Execute pre-create hook (blocking, fail-fast)
+  const preCreateResult = await executeHook(
+    "pre-create",
+    hooks["pre-create"],
+    hookContext,
+  );
+  if (isErr(preCreateResult)) {
+    return err(new WorktreeError(preCreateResult.error.message));
+  }
 
   try {
     await fs.access(worktreeDirectory);
@@ -108,9 +126,15 @@ export async function createWorktree(
     let skippedFiles: string[] | undefined;
     let copyError: string | undefined;
 
+    // The post-create hook's copyFiles are copied here so that the result is
+    // reported to the caller; they are stripped from the hook config below to
+    // avoid copying them twice.
+    const { copyFiles: postCreateCopyFiles, ...postCreateHook } =
+      hooks["post-create"] ?? {};
+
     const filesToCopy = mergeWorktreeCopyFiles(
-      requestedCopyFiles,
       postCreateCopyFiles,
+      requestedCopyFiles,
     );
 
     if (filesToCopy) {
@@ -124,18 +148,22 @@ export async function createWorktree(
       }
     }
 
-    if (postCreateCommands && postCreateCommands.length > 0) {
-      logger?.log?.("\nRunning post-create commands...");
-      const commandsResult = await executePostCreateCommands({
-        gitRoot,
-        worktreesDirectory: worktreeDirectory,
-        worktreeName: name,
-        commands: postCreateCommands,
-        logger,
-      });
-      if (isErr(commandsResult)) {
-        return err(new WorktreeError(commandsResult.error.message));
+    // Execute post-create hook (blocking)
+    if (hooks["post-create"]) {
+      logger?.log?.("\nRunning post-create hooks...");
+      const postCreateResult = await executeHook(
+        "post-create",
+        postCreateHook,
+        hookContext,
+      );
+      if (isErr(postCreateResult)) {
+        return err(new WorktreeError(postCreateResult.error.message));
       }
+    }
+
+    // Execute post-start hook (background)
+    if (hooks["post-start"]) {
+      executeHook("post-start", hooks["post-start"], hookContext);
     }
 
     return ok({
@@ -181,22 +209,16 @@ export async function runCreateWorktree(
       worktreeName = nameResult.value;
     }
 
-    const filesToCopy = mergeWorktreeCopyFiles(
-      context.config?.postCreate?.copyFiles,
-      options.copyFiles,
-    );
-
     const createResult = await createWorktree(
       context.gitRoot,
       context.worktreesDirectory,
       worktreeName,
       {
         base: options.base,
-        copyFiles: filesToCopy,
+        copyFiles: options.copyFiles,
         logger: options.logger,
       },
-      undefined,
-      context.config?.postCreate?.commands,
+      context.hooks,
       context.directoryNameSeparator,
     );
     if (isErr(createResult)) {

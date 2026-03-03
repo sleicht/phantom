@@ -31,7 +31,8 @@ export const deleteWorktreeTool: Tool<typeof schema> = {
         force,
         keepBranch: keepBranch ?? context.preferences.keepBranch,
       },
-      context.config?.preDelete?.commands,
+      context.hooks,
+      context.directoryNameSeparator,
     );
 
     if (!isOk(result)) {
