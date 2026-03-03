@@ -8,11 +8,12 @@ const getStatusMock = vi.fn();
 const removeWorktreeMock = vi.fn();
 const deleteBranchMock = vi.fn();
 
-const executeHookMock = vi.fn(() =>
-  Promise.resolve({
-    ok: true,
-    value: { executedCommands: [], backgroundCommands: [] },
-  }),
+const executeHookMock = vi.fn(
+  (_hookType: string, _hookConfig: unknown, _context: unknown) =>
+    Promise.resolve({
+      ok: true,
+      value: { executedCommands: [], backgroundCommands: [] },
+    }),
 );
 
 vi.doMock("./validate.ts", () => ({
@@ -260,7 +261,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      {},
+      { "pre-delete": { commands: ["echo cleanup"] } },
       "/",
     );
 
@@ -271,6 +272,10 @@ describe("deleteWorktree", () => {
         "Worktree 'feature' has uncommitted changes (3 files). Use --force to delete anyway.",
       );
     }
+
+    // the pre-delete hook runs before the uncommitted changes check
+    strictEqual(executeHookMock.mock.calls.length, 1);
+    strictEqual(executeHookMock.mock.calls[0][0], "pre-delete");
   });
 
   it("deletes with force when uncommitted changes exist", async () => {

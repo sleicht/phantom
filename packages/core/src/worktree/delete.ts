@@ -115,16 +115,6 @@ export async function deleteWorktree(
     );
   }
 
-  const status = await getWorktreeChangesStatus(worktreePath);
-
-  if (status.hasUncommittedChanges && !force) {
-    return err(
-      new WorktreeError(
-        `Worktree '${name}' has uncommitted changes (${status.changedFiles} files). Use --force to delete anyway.`,
-      ),
-    );
-  }
-
   const hookContext = {
     gitRoot,
     worktreesDirectory: worktreeDirectory,
@@ -134,6 +124,7 @@ export async function deleteWorktree(
   };
 
   // Execute pre-delete hook (blocking, fail-fast)
+  // Runs before uncommitted changes check so hooks can clean up files
   if (hooks["pre-delete"]) {
     logger?.log?.("\nRunning pre-delete hooks...");
     const preDeleteResult = await executeHook(
@@ -145,6 +136,16 @@ export async function deleteWorktree(
     if (isErr(preDeleteResult)) {
       return err(new WorktreeError(preDeleteResult.error.message));
     }
+  }
+
+  const status = await getWorktreeChangesStatus(worktreePath);
+
+  if (status.hasUncommittedChanges && !force) {
+    return err(
+      new WorktreeError(
+        `Worktree '${name}' has uncommitted changes (${status.changedFiles} files). Use --force to delete anyway.`,
+      ),
+    );
   }
 
   try {
