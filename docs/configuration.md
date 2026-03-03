@@ -50,7 +50,7 @@ Hooks are lifecycle commands that run at specific stages of worktree operations.
 | `pre-create` | Before worktree creation | Yes | Yes | No |
 | `post-create` | After worktree created | Yes | No | Yes |
 | `post-start` | After worktree created | No (background) | No | Yes |
-| `pre-delete` | Before worktree removed | Yes | Yes | No |
+| `pre-delete` | Before uncommitted changes check | Yes | Yes | No |
 | `post-delete` | After worktree removed | No (background) | No | No |
 
 **Blocking** hooks run in the foreground — the CLI waits for them to complete before continuing. **Background** hooks are fire-and-forget — the CLI returns immediately while the command continues running.
@@ -142,6 +142,7 @@ An array of commands to execute at the hook's lifecycle stage.
 - Commands run in the worktree's directory
 - Output is displayed in real-time (foreground hooks only)
 - For `pre-create` and `pre-delete` hooks: execution stops on the first failed command (fail-fast) and the operation is aborted
+- `pre-delete` hooks run before the uncommitted changes check, so they can clean up files (e.g. `docker compose down`) that would otherwise block deletion
 - For `post-create` hooks: all commands are attempted; errors are collected and reported
 - For `post-start` and `post-delete` hooks: commands are spawned in the background
 

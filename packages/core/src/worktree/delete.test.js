@@ -193,7 +193,7 @@ describe("deleteWorktree", () => {
       "/test/repo/.git/phantom/worktrees",
       "feature",
       {},
-      {},
+      { "pre-delete": [{ command: "echo cleanup" }] },
     );
 
     strictEqual(isErr(result), true);
@@ -204,6 +204,10 @@ describe("deleteWorktree", () => {
         "Worktree 'feature' has uncommitted changes (3 files). Use --force to delete anyway.",
       );
     }
+
+    // pre-delete hook should have run before the uncommitted changes check
+    strictEqual(executeHookMock.mock.calls.length, 1);
+    strictEqual(executeHookMock.mock.calls[0].arguments[0], "pre-delete");
   });
 
   it("should delete worktree with uncommitted changes when force is true", async () => {
